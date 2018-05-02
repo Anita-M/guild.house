@@ -4,6 +4,7 @@ from django import forms
 from tinymce.widgets import TinyMCE
 from localflavor.au.forms import AUPhoneNumberField
 from .models import Booking
+from .models import BookingDate
 from .settings import DURATION_SELECTION, BOOKING_TIMES_CHOICES
 
 
@@ -33,7 +34,7 @@ class BookingForm(forms.ModelForm):
                 attrs={'rows': 4,  'width': 185, 'cols': 0}),
             'email': forms.TextInput(attrs={'placeholder': '**', }),
             'name': forms.TextInput(attrs={'placeholder': '**'}),
-            'party_size': forms.TextInput(attrs={'placeholder': '**'}),
+            'party_size': forms.TextInput(attrs={'min': 1, 'type': 'number', 'placeholder': '**'}),
             'hear_other': forms.Textarea(
                 attrs={'rows': 4,  'width': 185, 'cols': 0}),
         }
@@ -50,6 +51,24 @@ class BookingForm(forms.ModelForm):
             raise forms.ValidationError(
                 'Both a phone number and an email address are necessary for online bookings.')  # noqa
         return super(BookingForm, self).clean(*args, **kwargs)
+
+    def clean_party_size(self):
+        cleaned_data = super(BookingForm, self).clean()
+
+        try:
+            i = BookingDate.objects.get(date=cleaned_data.get('reserved_date')).total_pax
+            if i is None:
+                i = 0
+        except BookingDate.DoesNotExist:
+            i = 0
+
+        a = type(cleaned_data.get('party_size'))
+        b = type(i)
+        print(a, b)
+        if cleaned_data.get('party_size') > (140 - i) or cleaned_data.get('party_size') < 1:
+            raise forms.ValidationError(
+                "For this date we cannot accommodate for a booking size of {}. Please select a different date, reserve for a smaller party or call up to discuss your booking with our friendly staff".format(cleaned_data.get("party_size")))
+        return cleaned_data.get('party_size')
 
 
 class NewBookingForm(BookingForm):
